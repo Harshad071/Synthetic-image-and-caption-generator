@@ -8,6 +8,10 @@ A Streamlit web app that generates intelligent captions for images using a CNN +
 - Upload images to generate captions
 - Adjustable Top-K sampling for caption generation
 
+## Trained Model Files
+
+The trained model files (model_epoch_25.pt, model_epoch_50.pt) are not included in this repository due to GitHub's file size limit. If you need the trained model files, please contact the repository owner or submit a request.
+
 ## How to Run Locally
 
 1. Install dependencies:

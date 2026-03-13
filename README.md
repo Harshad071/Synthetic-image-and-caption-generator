@@ -12,6 +12,12 @@ A Streamlit web app that generates intelligent captions for images using a CNN +
 
 The trained model files (model_epoch_25.pt, model_epoch_50.pt) are not included in this repository due to GitHub's file size limit. If you need the trained model files, please contact the repository owner or submit a request.
 
+## Contact
+
+- **Email:** miharshad88@gmail.com
+- **Name:** Harshad Jadhav
+- **LinkedIn:** [Harshad Jadhav](https://www.linkedin.com/in/harshad-jadhav-073a41256/)
+
 ## How to Run Locally
 
 1. Install dependencies:

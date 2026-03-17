@@ -161,17 +161,43 @@ class ImageCaptioningModel(nn.Module):
 @st.cache_resource
 def load_tokenizer():
     """Load tokenizer from file"""
-    with open('tokenizer (3).pkl', 'rb') as f:
-        return pickle.load(f)
+    try:
+        with open('tokenizer (3).pkl', 'rb') as f:
+            return pickle.load(f)
+    except FileNotFoundError:
+        st.error("Tokenizer file 'tokenizer (3).pkl' not found!")
+        return None
+    except Exception as e:
+        st.error(f"Error loading tokenizer: {str(e)}")
+        return None
 
 @st.cache_resource
 def load_model(vocab_size):
     """Load model from file"""
-    model = ImageCaptioningModel(vocab_size=vocab_size).to(device)
-    state_dict = torch.load('model_epoch_50.pt', map_location=device)
-    model.load_state_dict(state_dict)
-    model.eval()
-    return model
+    model_paths = ['model_epoch_50.pt', 'model_epoch_25.pt']
+    model_path = None
+    
+    for path in model_paths:
+        try:
+            with open(path, 'rb'):
+                model_path = path
+                break
+        except FileNotFoundError:
+            continue
+    
+    if model_path is None:
+        st.error("Model file not found! Please upload 'model_epoch_50.pt' or 'model_epoch_25.pt'")
+        return None
+    
+    try:
+        model = ImageCaptioningModel(vocab_size=vocab_size).to(device)
+        state_dict = torch.load(model_path, map_location=device)
+        model.load_state_dict(state_dict)
+        model.eval()
+        return model
+    except Exception as e:
+        st.error(f"Error loading model: {str(e)}")
+        return None
 
 # =====================================
 # IMAGE PREPROCESSING

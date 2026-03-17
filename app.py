@@ -172,24 +172,17 @@ def load_tokenizer():
         return None
 
 @st.cache_resource
-def load_model(vocab_size):
+def load_model(vocab_size, model_path='model_epoch_50.pt'):
     """Load model from file"""
-    model_paths = ['model_epoch_50.pt', 'model_epoch_25.pt']
-    model_path = None
-    
-    for path in model_paths:
-        try:
-            with open(path, 'rb'):
-                model_path = path
-                break
-        except FileNotFoundError:
-            continue
-    
-    if model_path is None:
-        st.error("Model file not found! Please upload 'model_epoch_50.pt' or 'model_epoch_25.pt'")
-        return None
-    
     try:
+        # Check if model file exists
+        try:
+            with open(model_path, 'rb'):
+                pass
+        except FileNotFoundError:
+            st.error(f"Model file '{model_path}' not found!")
+            return None
+        
         model = ImageCaptioningModel(vocab_size=vocab_size).to(device)
         state_dict = torch.load(model_path, map_location=device)
         model.load_state_dict(state_dict)
@@ -272,7 +265,39 @@ st.markdown("*Generate intelligent descriptions for your images using CNN + Tran
 try:
     with st.spinner("Loading model and tokenizer..."):
         tokenizer = load_tokenizer()
-        model = load_model(vocab_size=len(tokenizer.word2idx))
+        
+    if tokenizer is None:
+        st.stop()
+        
+    # Model selection
+    st.subheader("🤖 Model Selection")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        model_option = st.selectbox(
+            "Select Model",
+            ["model_epoch_50.pt (Best)", "model_epoch_25.pt"],
+            help="Choose between model_epoch_50 (best quality) or model_epoch_25 (faster)",
+            key="model_select"
+        )
+    with col2:
+        st.write("")
+        st.write("")
+        reload = st.button("🔄 Reload Model", help="Click to load selected model")
+    
+    model_path = "model_epoch_50.pt" if "50" in model_option else "model_epoch_25.pt"
+    
+    # Try to load the selected model (use session_state to cache)
+    if 'current_model' not in st.session_state or st.session_state.get('current_model_path') != model_path or reload:
+        with st.spinner(f"Loading {model_option}..."):
+            model = load_model(vocab_size=len(tokenizer.word2idx), model_path=model_path)
+        if model is not None:
+            st.session_state['current_model'] = model
+            st.session_state['current_model_path'] = model_path
+    
+    model = st.session_state.get('current_model')
+    
+    if model is None:
+        st.stop()
 
     st.success("✅ Model loaded successfully!")
     st.info(f"Device: {device} | GPU: {'Available ✅' if torch.cuda.is_available() else 'Not Available ❌'}")

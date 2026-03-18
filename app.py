@@ -212,8 +212,12 @@ def create_causal_mask(seq_len):
 # =====================================
 # CAPTION GENERATION
 # =====================================
-def generate_caption(model, image_tensor, tokenizer, top_k=5, temperature=1.0):
-    """Generate caption for image using top-k sampling with temperature"""
+def generate_caption(model, image_tensor, tokenizer, top_k=5, temperature=1.0, use_beam_search=False, beam_width=3):
+    """Generate caption for image using top-k sampling with temperature or beam search"""
+    
+    if use_beam_search:
+        return generate_caption_beam(model, image_tensor, tokenizer, beam_width)
+    
     with torch.no_grad():
         encoder_output = model.encoder(image_tensor)
 
@@ -237,6 +241,60 @@ def generate_caption(model, image_tensor, tokenizer, top_k=5, temperature=1.0):
             break
 
     caption = tokenizer.decode(caption_tokens)
+    return caption
+
+def generate_caption_beam(model, image_tensor, tokenizer, beam_width=3):
+    """Generate caption using beam search"""
+    with torch.no_grad():
+        encoder_output = model.encoder(image_tensor)
+    
+    # Initialize beams: (tokens list, score)
+    beams = [([tokenizer.word2idx['<SOS>']], 0.0)]
+    completed_captions = []
+    
+    max_len = 100
+    for _ in range(max_len):
+        all_candidates = []
+        
+        for tokens, score in beams:
+            if tokens[-1] == tokenizer.word2idx['<EOS>']:
+                completed_captions.append((tokens, score))
+                continue
+                
+            input_tokens = torch.tensor([tokens], dtype=torch.long).to(device)
+            tgt_mask = create_causal_mask(input_tokens.size(1))
+            
+            with torch.no_grad():
+                logits = model.decoder(input_tokens, encoder_output, tgt_mask=tgt_mask)
+            
+            probs = F.softmax(logits[0, -1, :], dim=-1)
+            top_k_probs, top_k_idx = probs.topk(beam_width)
+            
+            for i in range(beam_width):
+                new_tokens = tokens + [top_k_idx[i].item()]
+                new_score = score + torch.log(top_k_probs[i]).item()
+                all_candidates.append((new_tokens, new_score))
+        
+        if not all_candidates:
+            break
+            
+        # Select top beam_width candidates
+        all_candidates.sort(key=lambda x: x[1], reverse=True)
+        beams = all_candidates[:beam_width]
+        
+        # Check if all beams are complete
+        if all(tokens[-1] == tokenizer.word2idx['<EOS>'] for tokens, _ in beams):
+            completed_captions.extend(beams)
+            break
+    
+    # Add incomplete beams to completed
+    completed_captions.extend(beams)
+    
+    # Select best caption
+    completed_captions.sort(key=lambda x: x[1] / len(x[0]), reverse=True)
+    best_tokens = completed_captions[0][0]
+    
+    caption = tokenizer.decode(best_tokens)
     return caption
 
 # =====================================
@@ -323,6 +381,12 @@ try:
             st.subheader("⚙️ Generation Settings")
             top_k = st.slider("Top-K Sampling", min_value=1, max_value=20, value=5)
             temperature = st.slider("Temperature", min_value=0.1, max_value=2.0, value=1.0, step=0.1, help="Higher = more creative, Lower = more deterministic")
+            
+            # Beam search option
+            use_beam_search = st.checkbox("Use Beam Search", value=False, help="Better quality but slower")
+            beam_width = 3
+            if use_beam_search:
+                beam_width = st.slider("Beam Width", min_value=2, max_value=5, value=3, help="Number of beams to search")
 
             if st.button("🚀 Generate Caption", use_container_width=True):
                 with st.spinner("Generating caption..."):
@@ -330,7 +394,7 @@ try:
                     image_tensor = transform(image).unsqueeze(0).to(device)
 
                     # Generate caption
-                    caption = generate_caption(model, image_tensor, tokenizer, top_k, temperature)
+                    caption = generate_caption(model, image_tensor, tokenizer, top_k, temperature, use_beam_search, beam_width)
 
                     # Display result
                     st.markdown(f"""

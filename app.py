@@ -212,8 +212,8 @@ def create_causal_mask(seq_len):
 # =====================================
 # CAPTION GENERATION
 # =====================================
-def generate_caption(model, image_tensor, tokenizer, top_k=5):
-    """Generate caption for image using top-k sampling"""
+def generate_caption(model, image_tensor, tokenizer, top_k=5, temperature=1.0):
+    """Generate caption for image using top-k sampling with temperature"""
     with torch.no_grad():
         encoder_output = model.encoder(image_tensor)
 
@@ -226,7 +226,9 @@ def generate_caption(model, image_tensor, tokenizer, top_k=5):
         with torch.no_grad():
             logits = model.decoder(input_tokens, encoder_output, tgt_mask=tgt_mask)
 
-        probs = F.softmax(logits[0, -1, :], dim=-1)
+        # Apply temperature scaling
+        logits = logits[0, -1, :] / temperature
+        probs = F.softmax(logits, dim=-1)
         top_k_probs, top_k_idx = probs.topk(top_k)
         next_token = top_k_idx[torch.multinomial(top_k_probs, 1)].item()
         caption_tokens.append(next_token)
@@ -320,6 +322,7 @@ try:
             # Caption generation parameters
             st.subheader("⚙️ Generation Settings")
             top_k = st.slider("Top-K Sampling", min_value=1, max_value=20, value=5)
+            temperature = st.slider("Temperature", min_value=0.1, max_value=2.0, value=1.0, step=0.1, help="Higher = more creative, Lower = more deterministic")
 
             if st.button("🚀 Generate Caption", use_container_width=True):
                 with st.spinner("Generating caption..."):
@@ -327,7 +330,7 @@ try:
                     image_tensor = transform(image).unsqueeze(0).to(device)
 
                     # Generate caption
-                    caption = generate_caption(model, image_tensor, tokenizer, top_k)
+                    caption = generate_caption(model, image_tensor, tokenizer, top_k, temperature)
 
                     # Display result
                     st.markdown(f"""

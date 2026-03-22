@@ -28,4 +28,6 @@ model/pytorch_model.bin
 model/tf_model.h5
 models/pytorch_model.bin
 models/tf_model.h5
+modelsss/pytorch_model.bin
+modelsss/tf_model.h5
 model_epoch_*.pt
